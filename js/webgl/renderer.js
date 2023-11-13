@@ -1,4 +1,4 @@
-export const FRAGMENT_SHADER = `#version 300 es
+export const frag = `#version 300 es
 
 #ifdef GL_ES
 precision mediump float;
@@ -8,10 +8,9 @@ out vec4 glFragColor;
 
 void main() {
   glFragColor = vec4(0.2, 0.5, 0.7, 1.0);
-}
-`
+}`
 
-const VERTEX_SHADER = `#version 300 es
+const vert = `#version 300 es
                    
 in vec2 position;
 
@@ -19,43 +18,20 @@ void main() {
     gl_Position = vec4(position, 0.0, 1.0);
 }`
 
-const defaultConfig = {
-    vertex: VERTEX_SHADER,
-    fragment: FRAGMENT_SHADER,
-
-    uniforms: [
-        {
-            type: 'uniform2f',
-            name: 'iResolution',
-            value: function (instance) {
-                return [instance.canvas.width, instance.canvas.height]
-            }
-        }
-    ],
-
-    animate: false,
-
-    onerror: (error) => console.log(error),
-    onrender: () => { },
-}
-
 export class WebGLRenderer {
-    constructor(canvas, config) {
-        config = { ...defaultConfig, ...config }
-
+    constructor(canvas, uniforms) {
         this.canvas = canvas
         this.gl = null
         this.programInfo = null
 
-        this.vertexShader = config.vertex
-        this.fragmentShader = config.fragment
+        this.vertexShader = vert
+        this.fragmentShader = frag
 
-        // set config
-        this.uniforms = config.uniforms
-        this.onerror = config.onerror
-        this.onrender = config.onrender
+        this.uniforms = uniforms
+    }
 
-        this.animate = config.animate
+    onerror(error) {
+        console.log(error)
     }
 
     initialize() {
@@ -100,8 +76,6 @@ export class WebGLRenderer {
         const position = this.programInfo.attributeLocations['position']
         this.gl.enableVertexAttribArray(position);
         this.gl.vertexAttribPointer(position, 2, this.gl.FLOAT, false, 0, 0);
-
-        // draw call
     }
 
     getWebGLContext() {
@@ -194,18 +168,5 @@ export class WebGLRenderer {
 
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
         gl.drawArrays(gl.TRIANGLES, 0, 6)
-
-        this.onrender()
-
-        if (this.animate) requestAnimationFrame(() => this.render())
-    }
-
-    resize() {
-        const observer = new ResizeObserver(() => {
-            this.canvas.width = this.canvas.clientWidth
-            this.canvas.height = this.canvas.clientHeight
-        })
-
-        observer.observe(this.canvas)
     }
 }

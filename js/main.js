@@ -1,16 +1,22 @@
-import { WebGLRenderer, FRAGMENT_SHADER } from './webgl/renderer.js'
-import { tokensProvider, completionItemProvider, languageConfiguration } from './editor/languages/glsl.js'
-import { Timer } from './misc/timer.js'
-import { FPSHandler } from './misc/fps.js'
-import { theme } from './editor/themes/one-dark.js'
-import { parseError } from './misc/error.js'
+import {WebGLRenderer, frag} from './webgl/renderer.js'
+import * as glsl from './editor/languages/glsl.js'
+import {Timer} from './misc/timer.js'
+import {FPSHandler} from './misc/fps.js'
+import {theme} from './editor/themes/one-dark.js'
+import {parseError} from './misc/error.js'
+import {Camera} from "./misc/camera.js";
 
 // ----------------------------------------------------------------------------------------------------
-// Misc Variables
+// Global Variables
 // ----------------------------------------------------------------------------------------------------
 const canvas = document.querySelector('canvas#canvas')
 const timer = new Timer()
 const fpsHandler = new FPSHandler()
+const camera = new Camera(0, 0, -1)
+
+let animate = false
+let preCameraAnimate = false
+let fpsInterval = null
 
 // ----------------------------------------------------------------------------------------------------
 // ---
@@ -19,24 +25,17 @@ function saveLocalStorage(code) {
     localStorage.setItem('code', code)
 }
 
-const code = localStorage.getItem('code') ?? FRAGMENT_SHADER
+const code = localStorage.getItem('code') ?? frag
+
+// ----------------------------------------------------------------------------------------------------
+// Initialize Monaco Editor
+// ----------------------------------------------------------------------------------------------------
 monaco.editor.defineTheme('one-dark', theme)
-monaco.languages.register({ id: 'glsl' })
-monaco.languages.setMonarchTokensProvider('glsl', tokensProvider)
-monaco.languages.registerCompletionItemProvider('glsl', completionItemProvider)
-monaco.languages.setLanguageConfiguration('glsl', languageConfiguration)
-monaco.languages.registerDocumentFormattingEditProvider('glsl', {
-    provideDocumentFormattingEdits(model, options) {
-        const code = model.getValue()
-        const formatted = GLSLX.format(code)
-        return [
-            {
-                range: model.getFullModelRange(),
-                text: formatted
-            }
-        ];
-    }
-});
+monaco.languages.register({id: 'glsl'})
+monaco.languages.setMonarchTokensProvider('glsl', glsl.tokensProvider)
+monaco.languages.registerCompletionItemProvider('glsl', glsl.completionItemProvider)
+monaco.languages.setLanguageConfiguration('glsl', glsl.languageConfiguration)
+monaco.languages.registerDocumentFormattingEditProvider('glsl', glsl.documentFormattingEditProvider);
 const editor = monaco.editor.create(document.querySelector('div#editor'), {
     value: code,
     language: 'glsl',
@@ -45,37 +44,8 @@ const editor = monaco.editor.create(document.querySelector('div#editor'), {
 });
 
 // ----------------------------------------------------------------------------------------------------
-// Renderer
-// ----------------------------------------------------------------------------------------------------
-const renderer = new WebGLRenderer(canvas, {
-    onrender: () => fpsHandler.update(),
-    onerror: (error) => {
-        parseError(error, editor)
-    },
-
-    fragment: code,
-
-    uniforms: [{
-        type: 'uniform1f',
-        name: 'iTime',
-        value: function (instance) {
-            return timer.getTime()
-        }
-    }, {
-        type: 'uniform2f',
-        name: 'iResolution',
-        value: function (instance) {
-            return [instance.canvas.clientWidth, instance.canvas.clientHeight]
-        }
-    }]
-})
-
-renderer.initialize()
-
-// ----------------------------------------------------------------------------------------------------
 // Editor
 // ----------------------------------------------------------------------------------------------------
-
 editor.addAction({
     id: "run-shader",
     label: "Run Shader",
@@ -98,8 +68,8 @@ editor.addAction({
         const errorDisplay = document.querySelector('#error-output')
         errorDisplay.innerHTML = '<span class="text-[#73c991]">Compiled successfully!</span>'
 
-        // format
-        editor.trigger("editor", "editor.action.formatDocument");
+        // format document
+        editor.trigger("editor", "editor.action.formatDocument", null);
 
         // update shader
         const code = _editor.getValue()
@@ -133,6 +103,41 @@ editor.addAction({
 //     },
 // })
 
+
+// ----------------------------------------------------------------------------------------------------
+// Renderer
+// ----------------------------------------------------------------------------------------------------
+const renderer = new WebGLRenderer(canvas, [
+    {
+        type: 'uniform1f',
+        name: 'iTime',
+        value: function () {
+            return timer.getTime()
+        }
+    }, {
+        type: 'uniform2f',
+        name: 'iResolution',
+        value: function (instance) {
+            return [instance.canvas.clientWidth, instance.canvas.clientHeight]
+        }
+    }, {
+        type: 'uniform3f',
+        name: 'iCameraPos',
+        value: function () {
+            return camera.getPos()
+        }
+    }, {
+        type: 'uniform3f',
+        name: 'iCameraDir',
+        value: function () {
+            return camera.getDir()
+        }
+    }
+])
+
+renderer.initialize()
+renderer.onerror = (error) => parseError(error, editor)
+
 // ----------------------------------------------------------------------------------------------------
 // Controls
 // ----------------------------------------------------------------------------------------------------
@@ -140,38 +145,45 @@ editor.addAction({
 // --------------------------------------------------
 // Timer Controls
 // --------------------------------------------------
-const resetButton = document.querySelector('button#reset')
-resetButton.addEventListener('click', _ => {
+const resetTimerBtn = document.querySelector('button#reset')
+resetTimerBtn.addEventListener('click', function () {
     timer.reset()
 
-    if (!renderer.animate)
+    if (!animate) {
+        updateTimer()
         renderer.render()
+    }
+
 })
 
-const toggleButton = document.querySelector('button#toggle')
-toggleButton.addEventListener('click', _ => {
-    for (const child of toggleButton.children) {
+const toggleTimerBtn = document.querySelector('button#toggle')
+toggleTimerBtn.addEventListener('click', function () {
+    for (const child of toggleTimerBtn.children)
         child.classList.toggle('hidden')
-    }
 
-    renderer.animate = !renderer.animate
-    if (renderer.animate) {
-        renderer.render()
-    }
+    animate = !animate
+    if (animate)
+        requestAnimationFrame(animationLoop)
 
     timer.toggle()
 })
 
-const timeDisplay = document.querySelector('span#time')
-setInterval(_ => timeDisplay.textContent = timer.getTime().toFixed(2), 100)
+const timerDisplay = document.querySelector('span#time')
+
+function updateTimer() {
+    timerDisplay.textContent = timer.getTime().toFixed(2)
+}
+
+updateTimer()
 
 // --------------------------------------------------
 // FPS Controls
 // --------------------------------------------------
 const fpsDisplay = document.querySelector('span#fps')
-const updateFPSDisplay = _ => fpsDisplay.textContent = (renderer.animate ? fpsHandler.getFPS() : 0) + " fps"
-updateFPSDisplay()
-setInterval(updateFPSDisplay, 1000);
+
+function updateFPS() {
+    fpsDisplay.textContent = fpsHandler.getFPS() + ' fps'
+}
 
 // --------------------------------------------------
 // Canvas Size
@@ -188,7 +200,7 @@ const observer = new ResizeObserver(entries => {
             canvas.height = displayHeight
         }
 
-        if (!renderer.animate)
+        if (!animate)
             renderer.render()
 
         sizeDisplay.textContent = `${canvas.width}x${canvas.height}`
@@ -212,3 +224,55 @@ document.addEventListener('fullscreenchange', _ => {
         child.classList.toggle('hidden')
     }
 });
+
+
+// --------------------------------------------------
+// Camera controls
+// --------------------------------------------------
+const cameraButton = document.querySelector('button#camera')
+
+cameraButton.addEventListener('click', async function () {
+    await camera.enable(canvas)
+    preCameraAnimate = animate
+    animate = true
+
+    requestAnimationFrame(animationLoop)
+})
+
+document.addEventListener('pointerlockchange', function () {
+    if (document.pointerLockElement !== canvas) {
+        camera.disable()
+        animate = preCameraAnimate
+    }
+})
+
+
+// ----------------------------------------------------------------------------------------------------
+// Animation Loop
+// ----------------------------------------------------------------------------------------------------
+function animationLoop() {
+    renderer.render()
+    fpsHandler.update()
+
+    if (fpsInterval === null) {
+        fpsInterval = setInterval(updateFPS, 100)
+        updateFPS()
+    }
+
+    if (camera.active)
+        camera.update()
+
+    if (timer.running)
+        updateTimer()
+
+    if (animate)
+        requestAnimationFrame(animationLoop)
+    else {
+        clearInterval(fpsInterval)
+        fpsInterval = null
+
+        // timer.stop()
+    }
+}
+
+requestAnimationFrame(animationLoop)

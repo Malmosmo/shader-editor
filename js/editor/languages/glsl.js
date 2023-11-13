@@ -36,7 +36,7 @@ const tokenizer = {
         }], // characters
         [/'[^\\']'/, 'string'], [/'/, 'string.invalid']],
     comment: [[/[^\/*]+/, 'comment'], [/\/\*/, 'comment', '@push'], // nested comment
-    ['\\*/', 'comment', '@pop'], [/[\/*]/, 'comment']],
+        ['\\*/', 'comment', '@pop'], [/[\/*]/, 'comment']],
     string: [[/[^\\"]+/, 'string'], [/\\./, 'string.escape.invalid'], [/"/, {
         token: 'string.quote',
         bracket: '@close',
@@ -60,10 +60,10 @@ export const tokensProvider = {
 
 export const languageConfiguration = {
     autoClosingPairs: [
-        { open: '(', close: ')' },
-        { open: '{', close: '}' },
-        { open: '[', close: ']' },
-        { open: '/**', close: ' */', notIn: ['string'] }
+        {open: '(', close: ')'},
+        {open: '{', close: '}'},
+        {open: '[', close: ']'},
+        {open: '/**', close: ' */', notIn: ['string']}
     ],
     brackets: [
         ['{', '}'],
@@ -96,7 +96,20 @@ export const completionItemProvider = {
             })
         ]
 
-        return { suggestions: suggestions }
+        return {suggestions: suggestions}
     }
 }
 
+export const documentFormattingEditProvider = {
+    provideDocumentFormattingEdits: function (model, options, token) {
+        const code = model.getValue()
+
+        // todo: preprocess + apply options (+ custom formatter)
+        const formatted = GLSLX.format(code)
+
+        return [{
+            range: model.getFullModelRange(),
+            text: formatted
+        }];
+    }
+}

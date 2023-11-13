@@ -1,3 +1,3 @@
 *.exe
-css/tw.css
+js/vendors/
 tailwind.config.js
