@@ -5,6 +5,20 @@ import {FPSHandler} from './misc/fps.js'
 import {theme} from './editor/themes/one-dark.js'
 import {parseError} from './misc/error.js'
 import {Camera} from "./misc/camera.js";
+import {FileSystem} from "./misc/fs.js";
+
+// ----------------------------------------------------------------------------------------------------
+// Sidebar toggle buttons
+// ----------------------------------------------------------------------------------------------------
+document.querySelector('[data-action=sidebar-toggle]').addEventListener('click', _ => {
+        const sidebar = document.querySelector('#sidebar')
+    sidebar.classList.toggle('hidden')
+
+        // const targetSelector = item.getAttribute('data-target')
+        // const target = document.querySelector(targetSelector)
+        // target.classList.toggle('hidden')
+
+})
 
 // ----------------------------------------------------------------------------------------------------
 // Global Variables
@@ -246,6 +260,23 @@ document.addEventListener('pointerlockchange', function () {
     }
 })
 
+// ----------------------------------------------------------------------------------------------------
+// File System
+// ----------------------------------------------------------------------------------------------------
+const fs = new FileSystem(document.querySelector('#file-tree'))
+fs.createHTML()
+
+document.querySelector('[data-action=add-file]').addEventListener('click', _ => {
+    const filename = prompt('Filename')
+    if (filename)
+        fs.newFile(filename)
+})
+
+document.querySelector('[data-action=add-dir]').addEventListener('click', _ => {
+    const dirname = prompt('Dirname')
+    if (dirname)
+        fs.newDir(dirname)
+})
 
 // ----------------------------------------------------------------------------------------------------
 // Animation Loop

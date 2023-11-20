@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<button id="add" class="border">Add Dir</button>
+<button id="add-file" class="border">Add File</button>
+<div class="border" id="fs" style="width: 400px; margin: 2rem"></div>
+
+<script src="/js/misc/fs.js"></script>
+<script>
+    const fs = new FileSystem(document.querySelector('#fs'))
+    fs.createHTML()
+
+    document.querySelector('#add').addEventListener('click', _ => {
+        const name = prompt('Dir Name')
+        if (name !== null)
+            fs.newDir(name)
+    })
+
+    document.querySelector('#add-file').addEventListener('click', _ => {
+        const name = prompt('File Name')
+        if (name !== null)
+            fs.newFile(name)
+    })
+</script>
+</body>
+</html>
